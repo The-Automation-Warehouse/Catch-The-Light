@@ -5,6 +5,8 @@
 #define LEDS_PIN 3
 #define BUTTON_LED 4
 #define BUZZER 9
+#define WIN_LEDS 5
+#define TRY_AGAIN_LEDS 6
 
 
 #define NUM_LEDS 300
@@ -19,6 +21,10 @@ void setup() {
   pinMode(BUTTON, INPUT_PULLUP);
   pinMode(BUTTON_LED, OUTPUT);
   pinMode(BUZZER, OUTPUT);
+  pinMode(WIN_LEDS, OUTPUT);
+  pinMode(TRY_AGAIN_LEDS, OUTPUT);
+  digitalWrite(WIN_LEDS, LOW);
+  digitalWrite(TRY_AGAIN_LEDS, LOW);
   digitalWrite(BUTTON_LED, HIGH);
   digitalWrite(BUZZER, LOW);
   attachInterrupt(digitalPinToInterrupt(BUTTON), handleButton, FALLING);
