@@ -13,7 +13,7 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include helperFunctions.h
+#include "helperFunctions.h"
 
 #define BUTTON 2
 #define LEDS_PIN 3
@@ -45,8 +45,17 @@ int rings[] = {ring1, ring2, ring3, ring4, ring5, ring6, ring7, ring8, middle};
 #define NUM_LEDS 241
 CRGB leds[NUM_LEDS];
 
+// Game variables
+int currentRing = 0;
+
+// Easy - 1
+// Medium - 2
+// Hard - 3
+int difficulty = 0;
+
 
 void handleButton();
+void selectDifficulty();
 
 void setup() { 
 
@@ -58,9 +67,9 @@ void setup() {
   pinMode(TRY_AGAIN_LEDS, OUTPUT);
   digitalWrite(WIN_LEDS, LOW);
   digitalWrite(TRY_AGAIN_LEDS, LOW);
-  digitalWrite(BUTTON_LED, HIGH);
+  digitalWrite(BUTTON_LED, LOW);
   digitalWrite(BUZZER, LOW);
-  attachInterrupt(digitalPinToInterrupt(BUTTON), handleButton, FALLING);
+  
 
   FastLED.addLeds<WS2812B, LEDS_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(20);
@@ -87,7 +96,9 @@ void setup() {
 
 void loop() { 
 
+  
 
+  selectDifficulty();
 
 
 }
@@ -100,14 +111,118 @@ void loop() {
 
 
 void handleButton() {
-    // Light each ring with a random color
+    
 
-  for (int i = 0; i < NUM_RINGS; i++) {
-    for (int j = 0; j < rings[i]; j++) {
-      leds[j] = CRGB(random(255), random(255), random(255));
+}
+
+
+
+
+
+
+
+
+void selectDifficulty() {
+  // The user can switch between the difficulty levels by pressing the button
+  // By holding the button for 3 seconds, the user can confirm the selection
+  
+  // Easy - 1
+  // Medium - 2
+  // Hard - 3
+  
+  bool confirmSelection = false;
+  bool changeDifficulty = false;
+  int difficulty = 1;
+  unsigned long startMillis = millis(); // Store the start time
+  const unsigned long timeout = 60000;  // 60 seconds timeout
+
+  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  fillRing(leds, CRGB::Green, rings, 0);
+  FastLED.show();
+
+  digitalWrite(BUTTON_LED, HIGH);
+  
+  while (!confirmSelection && (millis() - startMillis < timeout)) {  // Add timeout condition
+    if (digitalRead(BUTTON) == LOW) {
+      delay(50); // Debounce delay
+      if (digitalRead(BUTTON) == LOW) { // Check again after debounce delay
+        unsigned long lastMillis = millis();
+        // Check if the button is pressed for 2 seconds
+        while (digitalRead(BUTTON) == LOW) {
+          if (millis() - lastMillis > 2000) {
+            confirmSelection = true;
+            tone(BUZZER, 480, 400);
+            break;
+          }
+        }
+        if (!confirmSelection) {
+          tone(BUZZER, 800, 100);
+          changeDifficulty = true;
+        }
+      }
+    }     
+    
+    if (changeDifficulty) {
+      difficulty++;
+      if (difficulty > 3) {
+        difficulty = 1;
+      }
+      
+      switch (difficulty) {
+        case 1:
+          fill_solid(leds, NUM_LEDS, CRGB::Black);
+          fillRing(leds, CRGB::Green, rings, 0);
+          FastLED.show();
+          break;
+        case 2:
+          fill_solid(leds, NUM_LEDS, CRGB::Black);
+          fillRing(leds, CRGB::Yellow, rings, 1);
+          FastLED.show();
+          break;
+        case 3:
+          fill_solid(leds, NUM_LEDS, CRGB::Black);
+          fillRing(leds, CRGB::Red, rings, 2);
+          FastLED.show();
+          break;
+      }
+      changeDifficulty = false;
     }
-    FastLED.show();
   }
 
+  digitalWrite(BUTTON_LED, LOW);
+  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  delay(500);
   
+  if (confirmSelection) {  // Only blink if selection is confirmed
+    // Blink the corresponding ring to indicate the selected difficulty
+    for (int i = 0; i < 3; i++) {
+      switch (difficulty) {
+        case 1:
+          fillRing(leds, CRGB::Green, rings, 0);
+          break;
+        case 2:
+          fillRing(leds, CRGB::Yellow, rings, 1);
+          break;
+        case 3:
+          fillRing(leds, CRGB::Red, rings, 2);
+          break;
+      }
+      FastLED.show();
+      delay(200);
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+      delay(200);
+    }
+  } else {
+    // If the selection is not confirmed run the function again
+    selectDifficulty();
+  }
 }
+
+  
+
+
+
+
+  
+
