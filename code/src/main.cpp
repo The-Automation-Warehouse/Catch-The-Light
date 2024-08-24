@@ -48,6 +48,8 @@ CRGB leds[NUM_LEDS];
 
 // Game variables
 int currentRing = 0;
+int currentLED = 0;
+int stopLED = 0;
 int targetLEDs[5] = {0, 0, 0, 0, 0};
 int totalLEDs = 0;
 bool gameWon = false;
@@ -120,7 +122,18 @@ void loop() {
 
 
 void handleButton() {
-    
+    stopLED = currentLED;
+    // Check if the button is pressed at the right time
+    if (stopLED == targetLEDs[0] || stopLED == targetLEDs[1] || stopLED == targetLEDs[2] || stopLED == targetLEDs[3] || stopLED == targetLEDs[4]) {
+      // If the button is pressed at the right time, the light progresses to the next ring
+      currentRing++;
+      if (currentRing == NUM_RINGS) {
+        gameWon = true;
+      }
+    } else {
+      // If the button is pressed at the wrong time, the game is over
+      gameLost = true;
+    }
 
 }
 
@@ -246,47 +259,49 @@ void selectDifficulty() {
 void playGame() {
   while (!gameWon && !gameLost)
   {
-      for (int i = 0; i < NUM_RINGS; i++) {
-        Serial.println("Current ring: ");
-        Serial.println(i);
-
-        // Pick a random LED to light up as the target depending on the difficulty
-        // Easy - 1 LED
-        // Medium - 3 LEDs
-        // Hard - 5 LEDs
+    Serial.println("Current ring: ");
+    Serial.println(currentRing);
+    totalLEDs = 0;
+    currentLED = 0;
+    fill_solid(leds, NUM_LEDS, CRGB::Black);
+    FastLED.show();
+    // Pick a random LED to light up as the target depending on the difficulty
+    // Easy - 5 LED
+    // Medium - 3 LEDs
+    // Hard - 1 LEDs
       
-      switch (difficulty) {
-        case 1:
-        {
-          Serial.println("Easy");
-          for (int j = 0; j < currentRing; j++) {
-            totalLEDs += rings[j];
-          }
+    switch (difficulty) {
+      case 1:
+      {
+        Serial.println("Easy");
+        for (int j = 0; j < currentRing; j++) {
+          totalLEDs += rings[j];
+        }
+        targetLEDs[2] = random(totalLEDs, totalLEDs + rings[currentRing]);
+        targetLEDs[3] = targetLEDs[2] + 1;
+        targetLEDs[4] = targetLEDs[2] + 2;
+        targetLEDs[1] = targetLEDs[2] - 1;
+      }
+        break;
+      case 2:
+      {
+        Serial.println("Medium");
+        for (int j = 0; j < currentRing; j++) {
+          totalLEDs += rings[j];
+        }
+        targetLEDs[1] = random(totalLEDs, totalLEDs + rings[currentRing]);
+        targetLEDs[2] = targetLEDs[1] + 1;
+        targetLEDs[0] = targetLEDs[1] - 1;
+      }
+        break; 
+      case 3:
+      {
+        Serial.println("Hard");
+        targetLEDs[0] = targetLEDs[2] - 2;
+        for (int j = 0; j < currentRing; j++) {
+          totalLEDs += rings[j];
+        }
           targetLEDs[0] = random(totalLEDs, totalLEDs + rings[currentRing]);
-        }
-          break;
-        case 2:
-        {
-          Serial.println("Medium");
-          for (int j = 0; j < currentRing; j++) {
-            totalLEDs += rings[j];
-          }
-          targetLEDs[1] = random(totalLEDs, totalLEDs + rings[currentRing]);
-          targetLEDs[2] = targetLEDs[1] + 1;
-          targetLEDs[0] = targetLEDs[1] - 1;
-        }
-          break; 
-        case 3:
-        {
-          Serial.println("Hard");
-          for (int j = 0; j < currentRing; j++) {
-            totalLEDs += rings[j];
-          }
-          targetLEDs[2] = random(totalLEDs, totalLEDs + rings[currentRing]);
-          targetLEDs[3] = targetLEDs[2] + 1;
-          targetLEDs[4] = targetLEDs[2] + 2;
-          targetLEDs[1] = targetLEDs[2] - 1;
-          targetLEDs[0] = targetLEDs[2] - 2;
         }
           break;
       }
@@ -299,12 +314,35 @@ void playGame() {
       // Light up the target LEDs
       for (int j = 0; j < 5; j++) {
         if (targetLEDs[j] != 0) {
-          leds[targetLEDs[j]] = CRGB::White;
+          leds[targetLEDs[j]] = CRGB::Yellow;
         }
       }
       FastLED.show();
-      delay(1000);
-    }
+      delay(500);
+
+      bool nextRound = false;
+      attachInterrupt(digitalPinToInterrupt(BUTTON), handleButton, FALLING);
+      while (!nextRound) {
+        // Play the actual game
+        fadeToBlackBy(leds, NUM_LEDS, 60);
+        
+        // Light up the target LEDs
+        for (int j = 0; j < 5; j++) {
+          if (targetLEDs[j] != 0) {
+            leds[targetLEDs[j]] = CRGB::Yellow;
+          }
+        }
+        //Draw the moving light
+        leds[currentLED] = CRGB::Green;
+        FastLED.show();
+        delay(16);
+        currentLED++;
+
+        if (currentLED == totalLEDs + rings[currentRing]) {
+          currentLED = totalLEDs;
+        }
+      }
+
   }
 }
 
