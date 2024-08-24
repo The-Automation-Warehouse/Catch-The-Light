@@ -20,8 +20,8 @@
 #define LEDS_PIN 3
 #define BUTTON_LED 4
 #define BUZZER 9
-#define WIN_LEDS 5
-#define TRY_AGAIN_LEDS 6
+#define WIN_LEDS 6
+#define TRY_AGAIN_LEDS 5
 
 // Ring 1 - 60 LEDs
 // Ring 2 - 48 LEDs
@@ -46,14 +46,17 @@ int rings[] = {ring1, ring2, ring3, ring4, ring5, ring6, ring7, ring8, middle};
 #define NUM_LEDS 241
 CRGB leds[NUM_LEDS];
 
+bool doInterrupt = false;
+
 // Game variables
 int currentRing = 0;
 int currentLED = 0;
 int stopLED = 0;
 int targetLEDs[5] = {0, 0, 0, 0, 0};
 int totalLEDs = 0;
+bool nextRound = false;
 bool gameWon = false;
-bool gameLost = false;
+bool gameOver = false;
 // Easy - 1
 // Medium - 2
 // Hard - 3
@@ -76,7 +79,8 @@ void setup() {
   digitalWrite(TRY_AGAIN_LEDS, HIGH);
   digitalWrite(BUTTON_LED, LOW);
   digitalWrite(BUZZER, LOW);
-  
+
+  randomSeed(analogRead(A0));
 
   FastLED.addLeds<WS2812B, LEDS_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(20);
@@ -122,18 +126,30 @@ void loop() {
 
 
 void handleButton() {
+
+  if (doInterrupt) {
     stopLED = currentLED;
     // Check if the button is pressed at the right time
     if (stopLED == targetLEDs[0] || stopLED == targetLEDs[1] || stopLED == targetLEDs[2] || stopLED == targetLEDs[3] || stopLED == targetLEDs[4]) {
       // If the button is pressed at the right time, the light progresses to the next ring
       currentRing++;
       if (currentRing == NUM_RINGS) {
+        gameOver = true;
         gameWon = true;
+        doInterrupt = false;
+      } else {
+        nextRound = true;
+        doInterrupt = false;
       }
     } else {
       // If the button is pressed at the wrong time, the game is over
-      gameLost = true;
+      gameOver = true;
+      nextRound = true;
+      doInterrupt = false;
     }
+    Serial.print("Stopped at: ");
+    Serial.println(stopLED);
+  }
 
 }
 
@@ -254,12 +270,27 @@ void selectDifficulty() {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   
 
 void playGame() {
-  while (!gameWon && !gameLost)
+  while (!gameOver)
   {
-    Serial.println("Current ring: ");
+    Serial.print("Current ring: ");
     Serial.println(currentRing);
     totalLEDs = 0;
     currentLED = 0;
@@ -269,7 +300,8 @@ void playGame() {
     // Easy - 5 LED
     // Medium - 3 LEDs
     // Hard - 1 LEDs
-      
+
+resetTarget:
     switch (difficulty) {
       case 1:
       {
@@ -281,6 +313,7 @@ void playGame() {
         targetLEDs[3] = targetLEDs[2] + 1;
         targetLEDs[4] = targetLEDs[2] + 2;
         targetLEDs[1] = targetLEDs[2] - 1;
+        targetLEDs[0] = targetLEDs[2] - 2;
       }
         break;
       case 2:
@@ -306,9 +339,22 @@ void playGame() {
           break;
       }
 
+      // Check if the target LEDs are not out of bounds
+      for (int j = 0; j < 5; j++) {
+        if (targetLEDs[j] < totalLEDs || targetLEDs[j] > totalLEDs + rings[currentRing]) {
+          for (int j = 0; j < 5; j++) {
+            targetLEDs[j] = 0;
+          }
+          totalLEDs = 0;
+          Serial.println("Target out of bounds");
+          goto resetTarget;
+        }
+      }
+
       Serial.println("Target LEDs: ");
       for (int j = 0; j < 5; j++) {
-        Serial.println(targetLEDs[j]);
+        Serial.print(targetLEDs[j]);
+        Serial.print(" ");
       }
 
       // Light up the target LEDs
@@ -318,10 +364,10 @@ void playGame() {
         }
       }
       FastLED.show();
-      delay(500);
-
-      bool nextRound = false;
+      delay(300);
       attachInterrupt(digitalPinToInterrupt(BUTTON), handleButton, FALLING);
+      delay(200);
+      doInterrupt = true;
       while (!nextRound) {
         // Play the actual game
         fadeToBlackBy(leds, NUM_LEDS, 60);
@@ -342,7 +388,54 @@ void playGame() {
           currentLED = totalLEDs;
         }
       }
+      doInterrupt = false;
+      detachInterrupt(digitalPinToInterrupt(BUTTON));
+      nextRound = false;
+  }
+  if (gameWon) {
+    // Light up the win LEDs
+    digitalWrite(WIN_LEDS, HIGH);
+    for (int i = 0; i < 3; i++) {
+      fill_solid(leds, NUM_LEDS, CRGB::Green);
+      FastLED.show();
+      delay(500);
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+      delay(500);
+    }
+    digitalWrite(WIN_LEDS, LOW);
+  } else {
+    // Light up the try again LEDs
+    digitalWrite(TRY_AGAIN_LEDS, HIGH);
+    for (int i = 0; i < 3; i++) {
+      fill_solid(leds, NUM_LEDS, CRGB::Red);
+      FastLED.show();
+      delay(500);
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+      delay(500);
+    }
+    digitalWrite(TRY_AGAIN_LEDS, LOW);
+  }
 
+  // Reset the game variables
+  currentRing = 0;
+  currentLED = 0;
+  stopLED = 0;
+  for (int j = 0; j < 5; j++) {
+    targetLEDs[j] = 0;
+  }
+  nextRound = false;
+  gameWon = false;
+  gameOver = false;
+  doInterrupt = false;
+  
+  // Play the loading animation
+  for (int i = 0; i < NUM_LEDS; i++) {
+    fadeToBlackBy(leds, NUM_LEDS, 10);
+    leds[i] = CRGB::Cyan;
+    FastLED.show();
+    delay(6);
   }
 }
 
