@@ -18,6 +18,7 @@ void fillRing(CRGB leds[], CRGB color, int ringSizes[], int ringIndex) {
         tottalLeds += ringSizes[i];
     }
     
-  fill_solid(leds, tottalLeds, color);
-  fill_solid(leds, tottalLeds - ringSizes[ringIndex], CRGB::Black);
+  for (int i = tottalLeds - ringSizes[ringIndex]; i < tottalLeds; i++) {
+    leds[i] = color;
+  }
 }

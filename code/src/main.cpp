@@ -3,6 +3,7 @@
  * This is a crude arcade game inspired by "Speed Demon".
   * It consists of a ring of LEDs through which a light travels.
   * In each round, the light travels through the ring and the player has to press a button at the right time to stop the light.
+  * The difficulty of the game changes the number of target LEDs that light up in each ring.
   * If the player presses the button at the right time, the light progresses to the next round and the next ring of LEDs lights up.
   * If the player presses the button at the wrong time, the game is over.
   * The game is won when the light has traveled through all the rings.
@@ -47,7 +48,10 @@ CRGB leds[NUM_LEDS];
 
 // Game variables
 int currentRing = 0;
-
+int targetLEDs[5] = {0, 0, 0, 0, 0};
+int totalLEDs = 0;
+bool gameWon = false;
+bool gameLost = false;
 // Easy - 1
 // Medium - 2
 // Hard - 3
@@ -56,6 +60,7 @@ int difficulty = 0;
 
 void handleButton();
 void selectDifficulty();
+void playGame();
 
 void setup() { 
 
@@ -65,8 +70,8 @@ void setup() {
   pinMode(BUZZER, OUTPUT);
   pinMode(WIN_LEDS, OUTPUT);
   pinMode(TRY_AGAIN_LEDS, OUTPUT);
-  digitalWrite(WIN_LEDS, LOW);
-  digitalWrite(TRY_AGAIN_LEDS, LOW);
+  digitalWrite(WIN_LEDS, HIGH);
+  digitalWrite(TRY_AGAIN_LEDS, HIGH);
   digitalWrite(BUTTON_LED, LOW);
   digitalWrite(BUZZER, LOW);
   
@@ -88,6 +93,9 @@ void setup() {
     delay(6);
   }
 
+  digitalWrite(WIN_LEDS, LOW);
+  digitalWrite(TRY_AGAIN_LEDS, LOW);
+
 }
 
 
@@ -99,11 +107,12 @@ void loop() {
   
 
   selectDifficulty();
+  Serial.println("Difficulty selected: ");
+  Serial.println(difficulty);
+  playGame();
 
 
 }
-
-
 
 
 
@@ -124,6 +133,7 @@ void handleButton() {
 
 void selectDifficulty() {
   // The user can switch between the difficulty levels by pressing the button
+  // The difficulty changes how many LEDs light up in each ring
   // By holding the button for 3 seconds, the user can confirm the selection
   
   // Easy - 1
@@ -132,12 +142,13 @@ void selectDifficulty() {
   
   bool confirmSelection = false;
   bool changeDifficulty = false;
-  int difficulty = 1;
+  difficulty = 1;
   unsigned long startMillis = millis(); // Store the start time
   const unsigned long timeout = 60000;  // 60 seconds timeout
 
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   fillRing(leds, CRGB::Green, rings, 0);
+  fillRing(leds, CRGB::Green, rings, 1);
   FastLED.show();
 
   digitalWrite(BUTTON_LED, HIGH);
@@ -172,16 +183,19 @@ void selectDifficulty() {
         case 1:
           fill_solid(leds, NUM_LEDS, CRGB::Black);
           fillRing(leds, CRGB::Green, rings, 0);
+          fillRing(leds, CRGB::Green, rings, 1);
           FastLED.show();
           break;
         case 2:
           fill_solid(leds, NUM_LEDS, CRGB::Black);
-          fillRing(leds, CRGB::Yellow, rings, 1);
+          fillRing(leds, CRGB::Yellow, rings, 2);
+          fillRing(leds, CRGB::Yellow, rings, 3);
           FastLED.show();
           break;
         case 3:
           fill_solid(leds, NUM_LEDS, CRGB::Black);
-          fillRing(leds, CRGB::Red, rings, 2);
+          fillRing(leds, CRGB::Red, rings, 4);
+          fillRing(leds, CRGB::Red, rings, 5);
           FastLED.show();
           break;
       }
@@ -199,12 +213,15 @@ void selectDifficulty() {
       switch (difficulty) {
         case 1:
           fillRing(leds, CRGB::Green, rings, 0);
+          fillRing(leds, CRGB::Green, rings, 1);
           break;
         case 2:
-          fillRing(leds, CRGB::Yellow, rings, 1);
+          fillRing(leds, CRGB::Yellow, rings, 2);
+          fillRing(leds, CRGB::Yellow, rings, 3);
           break;
         case 3:
-          fillRing(leds, CRGB::Red, rings, 2);
+          fillRing(leds, CRGB::Red, rings, 4);
+          fillRing(leds, CRGB::Red, rings, 5);
           break;
       }
       FastLED.show();
@@ -225,4 +242,71 @@ void selectDifficulty() {
 
 
   
+
+void playGame() {
+  while (!gameWon && !gameLost)
+  {
+      for (int i = 0; i < NUM_RINGS; i++) {
+        Serial.println("Current ring: ");
+        Serial.println(i);
+
+        // Pick a random LED to light up as the target depending on the difficulty
+        // Easy - 1 LED
+        // Medium - 3 LEDs
+        // Hard - 5 LEDs
+      
+      switch (difficulty) {
+        case 1:
+        {
+          Serial.println("Easy");
+          for (int j = 0; j < currentRing; j++) {
+            totalLEDs += rings[j];
+          }
+          targetLEDs[0] = random(totalLEDs, totalLEDs + rings[currentRing]);
+        }
+          break;
+        case 2:
+        {
+          Serial.println("Medium");
+          for (int j = 0; j < currentRing; j++) {
+            totalLEDs += rings[j];
+          }
+          targetLEDs[1] = random(totalLEDs, totalLEDs + rings[currentRing]);
+          targetLEDs[2] = targetLEDs[1] + 1;
+          targetLEDs[0] = targetLEDs[1] - 1;
+        }
+          break; 
+        case 3:
+        {
+          Serial.println("Hard");
+          for (int j = 0; j < currentRing; j++) {
+            totalLEDs += rings[j];
+          }
+          targetLEDs[2] = random(totalLEDs, totalLEDs + rings[currentRing]);
+          targetLEDs[3] = targetLEDs[2] + 1;
+          targetLEDs[4] = targetLEDs[2] + 2;
+          targetLEDs[1] = targetLEDs[2] - 1;
+          targetLEDs[0] = targetLEDs[2] - 2;
+        }
+          break;
+      }
+
+      Serial.println("Target LEDs: ");
+      for (int j = 0; j < 5; j++) {
+        Serial.println(targetLEDs[j]);
+      }
+
+      // Light up the target LEDs
+      for (int j = 0; j < 5; j++) {
+        if (targetLEDs[j] != 0) {
+          leds[targetLEDs[j]] = CRGB::White;
+        }
+      }
+      FastLED.show();
+      delay(1000);
+    }
+  }
+}
+
+
 
