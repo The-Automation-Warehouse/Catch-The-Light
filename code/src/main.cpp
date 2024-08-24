@@ -14,7 +14,6 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include "helperFunctions.h"
 
 #define BUTTON 2
 #define LEDS_PIN 3
@@ -65,6 +64,7 @@ int difficulty = 0;
 
 void handleButton();
 void selectDifficulty();
+void fillRing(CRGB leds[], CRGB color, int ringSizes[], int ringIndex);
 void playGame();
 
 void setup() { 
@@ -129,15 +129,15 @@ void handleButton() {
 
   if (doInterrupt) {
     stopLED = currentLED;
-    // Check if the button is pressed at the right time
+    // Check if the button is pressed at the right time (the stopLED is any of the targetLEDs)
     if (stopLED == targetLEDs[0] || stopLED == targetLEDs[1] || stopLED == targetLEDs[2] || stopLED == targetLEDs[3] || stopLED == targetLEDs[4]) {
       // If the button is pressed at the right time, the light progresses to the next ring
-      currentRing++;
       if (currentRing == NUM_RINGS) {
         gameOver = true;
         gameWon = true;
         doInterrupt = false;
       } else {
+        currentRing++;
         nextRound = true;
         doInterrupt = false;
       }
@@ -272,7 +272,16 @@ void selectDifficulty() {
 
 
 
-
+void fillRing(CRGB leds[], CRGB color, int ringSizes[], int ringIndex) {
+    int tottalLeds = 0;
+    for (int i = 0; i < ringIndex+1; i++) {
+        tottalLeds += ringSizes[i];
+    }
+    
+  for (int i = tottalLeds - ringSizes[ringIndex]; i < tottalLeds; i++) {
+    leds[i] = color;
+  }
+}
 
 
 
@@ -298,47 +307,49 @@ void playGame() {
     FastLED.show();
     // Pick a random LED to light up as the target depending on the difficulty
     // Easy - 5 LED
-    // Medium - 3 LEDs
-    // Hard - 1 LEDs
+    // Medium - 4 LEDs
+    // Hard - 3 LEDs
 
 resetTarget:
+
+    for (int j = 0; j < currentRing; j++) {
+      totalLEDs += rings[j];
+    }
+    targetLEDs[0] = random(totalLEDs, totalLEDs + rings[currentRing]);
+
     switch (difficulty) {
       case 1:
       {
         Serial.println("Easy");
-        for (int j = 0; j < currentRing; j++) {
-          totalLEDs += rings[j];
-        }
-        targetLEDs[2] = random(totalLEDs, totalLEDs + rings[currentRing]);
-        targetLEDs[3] = targetLEDs[2] + 1;
-        targetLEDs[4] = targetLEDs[2] + 2;
-        targetLEDs[1] = targetLEDs[2] - 1;
-        targetLEDs[0] = targetLEDs[2] - 2;
+        targetLEDs[1] = targetLEDs[0] + 1;
+        targetLEDs[2] = targetLEDs[0] + 2;
+        targetLEDs[3] = targetLEDs[0] - 1;
+        targetLEDs[4] = targetLEDs[0] - 2;
       }
         break;
       case 2:
       {
         Serial.println("Medium");
-        for (int j = 0; j < currentRing; j++) {
-          totalLEDs += rings[j];
-        }
-        targetLEDs[1] = random(totalLEDs, totalLEDs + rings[currentRing]);
-        targetLEDs[2] = targetLEDs[1] + 1;
-        targetLEDs[0] = targetLEDs[1] - 1;
+        targetLEDs[1] = targetLEDs[0] + 1;
+        targetLEDs[2] = targetLEDs[0] + 2;
+        targetLEDs[3] = targetLEDs[0] - 1;
       }
         break; 
       case 3:
       {
         Serial.println("Hard");
-        targetLEDs[0] = targetLEDs[2] - 2;
-        for (int j = 0; j < currentRing; j++) {
-          totalLEDs += rings[j];
-        }
-          targetLEDs[0] = random(totalLEDs, totalLEDs + rings[currentRing]);
-        }
-          break;
+        targetLEDs[1] = targetLEDs[0] + 1;
+        targetLEDs[2] = targetLEDs[0] - 1;
+      }
+        break;
       }
 
+      Serial.println("Target LEDs: ");
+      for (int j = 0; j < 5; j++) {
+        Serial.print(targetLEDs[j]);
+        Serial.print(" ");
+      }
+      Serial.println();
       // Check if the target LEDs are not out of bounds
       for (int j = 0; j < 5; j++) {
         if (targetLEDs[j] < totalLEDs || targetLEDs[j] > totalLEDs + rings[currentRing]) {
@@ -347,20 +358,16 @@ resetTarget:
           }
           totalLEDs = 0;
           Serial.println("Target out of bounds");
+          randomSeed(analogRead(A0));
           goto resetTarget;
         }
       }
 
-      Serial.println("Target LEDs: ");
-      for (int j = 0; j < 5; j++) {
-        Serial.print(targetLEDs[j]);
-        Serial.print(" ");
-      }
 
       // Light up the target LEDs
       for (int j = 0; j < 5; j++) {
         if (targetLEDs[j] != 0) {
-          leds[targetLEDs[j]] = CRGB::Yellow;
+          leds[targetLEDs[j]] = CHSV(64, 255, 128);
         }
       }
       FastLED.show();
@@ -370,18 +377,25 @@ resetTarget:
       doInterrupt = true;
       while (!nextRound) {
         // Play the actual game
-        fadeToBlackBy(leds, NUM_LEDS, 60);
+
+        // Adjust the fade speed depending on the current ring but cap it at 160
+        fadeToBlackBy(leds, NUM_LEDS, min(160, (currentRing + 1) * 25));
         
-        // Light up the target LEDs
+        // Light up the target LEDs with 50% brightness
         for (int j = 0; j < 5; j++) {
           if (targetLEDs[j] != 0) {
-            leds[targetLEDs[j]] = CRGB::Yellow;
+            leds[targetLEDs[j]] = CHSV(64, 255, 128);
           }
         }
-        //Draw the moving light
-        leds[currentLED] = CRGB::Green;
+        // Draw the moving light
+        // Change the color of the light depending on the ring (if its in the current ring or not)
+        if (currentLED < totalLEDs) {
+          leds[currentLED] = CRGB::Green;
+        } else {
+          leds[currentLED] = CRGB::Blue;
+        }
         FastLED.show();
-        delay(16);
+        delay(26);
         currentLED++;
 
         if (currentLED == totalLEDs + rings[currentRing]) {
@@ -393,29 +407,38 @@ resetTarget:
       nextRound = false;
   }
   if (gameWon) {
-    // Light up the win LEDs
-    digitalWrite(WIN_LEDS, HIGH);
+    // Light up the win LEDs and play a winning sound and animation
+    // The animation lights up every second LED in the ring and alternates odd and even LEDs
     for (int i = 0; i < 3; i++) {
-      fill_solid(leds, NUM_LEDS, CRGB::Green);
-      FastLED.show();
-      delay(500);
       fill_solid(leds, NUM_LEDS, CRGB::Black);
+      for (int j = 0; j < NUM_LEDS/2; j++) {
+        leds[j*2] = CRGB::Green;
+      }
       FastLED.show();
-      delay(500);
+      tone(BUZZER, 1000, 200);
+      delay(200);
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      for (int j = 0; j < NUM_LEDS/2; j++) {
+        leds[j*2+1] = CRGB::Green;
+      }
+      FastLED.show();
+      delay(200);
     }
-    digitalWrite(WIN_LEDS, LOW);
+
+
   } else {
-    // Light up the try again LEDs
-    digitalWrite(TRY_AGAIN_LEDS, HIGH);
+    // Blink the try again LEDs and play and angry beeping sound
     for (int i = 0; i < 3; i++) {
       fill_solid(leds, NUM_LEDS, CRGB::Red);
+      digitalWrite(TRY_AGAIN_LEDS, HIGH);
       FastLED.show();
-      delay(500);
+      tone(BUZZER, 100, 200);
+      delay(200);
+      digitalWrite(TRY_AGAIN_LEDS, LOW);
       fill_solid(leds, NUM_LEDS, CRGB::Black);
       FastLED.show();
-      delay(500);
+      delay(200);
     }
-    digitalWrite(TRY_AGAIN_LEDS, LOW);
   }
 
   // Reset the game variables
