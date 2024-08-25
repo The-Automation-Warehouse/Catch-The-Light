@@ -31,17 +31,17 @@
 // Ring 7 - 8 LEDs
 // One LED in the middle
 
-int ring1 = 60;
-int ring2 = 48;
-int ring3 = 40;
-int ring4 = 32;
-int ring5 = 24;
-int ring6 = 16;
-int ring7 = 12;
-int ring8 = 8;
+int ring0 = 60;
+int ring1 = 48;
+int ring2 = 40;
+int ring3 = 32;
+int ring4 = 24;
+int ring5 = 16;
+int ring6 = 12;
+int ring7 = 8;
 int middle = 1;
-int rings[] = {ring1, ring2, ring3, ring4, ring5, ring6, ring7, ring8, middle};
-#define NUM_RINGS 9
+int rings[] = {ring0, ring1, ring2, ring3, ring4, ring5, ring6, ring7, middle};
+#define NUM_RINGS 7
 #define NUM_LEDS 241
 CRGB leds[NUM_LEDS];
 
@@ -52,6 +52,7 @@ int currentRing = 0;
 int currentLED = 0;
 int stopLED = 0;
 int targetLEDs[5] = {0, 0, 0, 0, 0};
+int oldTargetLEDs[80] = {0}; // Stores the previous target LEDs so that they can be lit up again in the next rounds
 int totalLEDs = 0;
 bool nextRound = false;
 bool gameWon = false;
@@ -133,6 +134,7 @@ void handleButton() {
     if (stopLED == targetLEDs[0] || stopLED == targetLEDs[1] || stopLED == targetLEDs[2] || stopLED == targetLEDs[3] || stopLED == targetLEDs[4]) {
       // If the button is pressed at the right time, the light progresses to the next ring
       if (currentRing == NUM_RINGS) {
+        Serial.println("Game won!");
         gameOver = true;
         gameWon = true;
         doInterrupt = false;
@@ -143,6 +145,7 @@ void handleButton() {
       }
     } else {
       // If the button is pressed at the wrong time, the game is over
+      Serial.println("Game over!");
       gameOver = true;
       nextRound = true;
       doInterrupt = false;
@@ -299,6 +302,9 @@ void fillRing(CRGB leds[], CRGB color, int ringSizes[], int ringIndex) {
 void playGame() {
   while (!gameOver)
   {
+    if (gameOver) {
+      break;
+    }
     Serial.print("Current ring: ");
     Serial.println(currentRing);
     totalLEDs = 0;
@@ -344,15 +350,24 @@ resetTarget:
         break;
       }
 
-      Serial.println("Target LEDs: ");
+      // Print the target LEDs
+      Serial.print("Target LEDs: ");
       for (int j = 0; j < 5; j++) {
         Serial.print(targetLEDs[j]);
         Serial.print(" ");
       }
       Serial.println();
+
+      // Print the old target LEDs
+      Serial.print("Old target LEDs: ");
+      for (int j = 0; j < 50; j++) {
+        Serial.print(oldTargetLEDs[j]);
+        Serial.print(" ");
+      }
+      Serial.println();
       // Check if the target LEDs are not out of bounds
       for (int j = 0; j < 5; j++) {
-        if (targetLEDs[j] < totalLEDs || targetLEDs[j] > totalLEDs + rings[currentRing]) {
+        if (targetLEDs[j] < totalLEDs || targetLEDs[j] + 1 > totalLEDs + rings[currentRing]) {
           for (int j = 0; j < 5; j++) {
             targetLEDs[j] = 0;
           }
@@ -375,27 +390,35 @@ resetTarget:
       attachInterrupt(digitalPinToInterrupt(BUTTON), handleButton, FALLING);
       delay(200);
       doInterrupt = true;
-      while (!nextRound) {
+      while (!nextRound && !gameOver) {
         // Play the actual game
 
         // Adjust the fade speed depending on the current ring but cap it at 160
         fadeToBlackBy(leds, NUM_LEDS, min(160, (currentRing + 1) * 25));
         
-        // Light up the target LEDs with 50% brightness
+        // Light up the target LEDs with 50% brightness yellow
         for (int j = 0; j < 5; j++) {
           if (targetLEDs[j] != 0) {
             leds[targetLEDs[j]] = CHSV(64, 255, 128);
           }
         }
+        // Light up the old target LEDs with 50% brightness red
+        for (unsigned int j = 0; j < sizeof(oldTargetLEDs) / sizeof(oldTargetLEDs[0]); j++) {
+            if (oldTargetLEDs[j] != 0) {
+                leds[oldTargetLEDs[j]] = CHSV(0, 255, 128);
+            }
+        }
         // Draw the moving light
         // Change the color of the light depending on the ring (if its in the current ring or not)
         if (currentLED < totalLEDs) {
           leds[currentLED] = CRGB::Green;
+          delay(10);
         } else {
           leds[currentLED] = CRGB::Blue;
+          delay(26);
         }
         FastLED.show();
-        delay(26);
+        
         currentLED++;
 
         if (currentLED == totalLEDs + rings[currentRing]) {
@@ -405,18 +428,33 @@ resetTarget:
       doInterrupt = false;
       detachInterrupt(digitalPinToInterrupt(BUTTON));
       nextRound = false;
+
+      // Add the target LEDs to the old target LEDs so that they can be lit up again in the next rounds
+      // The old target LEDs are stored in a array where each ring is given 10 spaces
+      for (int j = 0; j < 5; j++) {
+        if (targetLEDs[j] != 0) {
+          oldTargetLEDs[currentRing * 10 + j] = targetLEDs[j];
+        }
+      }
   }
+  Serial.println("Game over, playing animation");
   if (gameWon) {
     // Light up the win LEDs and play a winning sound and animation
     // The animation lights up every second LED in the ring and alternates odd and even LEDs
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 10; i++) {
+      tone(BUZZER, 1200, 100);
+      digitalWrite(WIN_LEDS, HIGH);
       fill_solid(leds, NUM_LEDS, CRGB::Black);
       for (int j = 0; j < NUM_LEDS/2; j++) {
         leds[j*2] = CRGB::Green;
       }
       FastLED.show();
-      tone(BUZZER, 1000, 200);
-      delay(200);
+      tone(BUZZER, 1200, 100);
+      delay(100);
+      tone(BUZZER, 1200, 100);
+      delay(100);
+      tone(BUZZER, 1200, 100);
+      digitalWrite(WIN_LEDS, LOW);
       fill_solid(leds, NUM_LEDS, CRGB::Black);
       for (int j = 0; j < NUM_LEDS/2; j++) {
         leds[j*2+1] = CRGB::Green;
