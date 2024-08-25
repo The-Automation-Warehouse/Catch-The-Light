@@ -166,7 +166,7 @@ void handleButton() {
 void selectDifficulty() {
   // The user can switch between the difficulty levels by pressing the button
   // The difficulty changes how many LEDs light up in each ring
-  // By holding the button for 3 seconds, the user can confirm the selection
+  // By holding the button for 1 seconds, the user can confirm the selection
   
   // Easy - 1
   // Medium - 2
@@ -190,9 +190,9 @@ void selectDifficulty() {
       delay(50); // Debounce delay
       if (digitalRead(BUTTON) == LOW) { // Check again after debounce delay
         unsigned long lastMillis = millis();
-        // Check if the button is pressed for 2 seconds
+        // Check if the button is pressed for 1 second
         while (digitalRead(BUTTON) == LOW) {
-          if (millis() - lastMillis > 2000) {
+          if (millis() - lastMillis > 1000) {
             confirmSelection = true;
             tone(BUZZER, 480, 400);
             break;
@@ -309,7 +309,6 @@ void playGame() {
     Serial.println(currentRing);
     totalLEDs = 0;
     currentLED = 0;
-    fill_solid(leds, NUM_LEDS, CRGB::Black);
     FastLED.show();
     // Pick a random LED to light up as the target depending on the difficulty
     // Easy - 5 LED
@@ -367,14 +366,16 @@ resetTarget:
       Serial.println();
       // Check if the target LEDs are not out of bounds
       for (int j = 0; j < 5; j++) {
-        if (targetLEDs[j] < totalLEDs || targetLEDs[j] + 1 > totalLEDs + rings[currentRing]) {
-          for (int j = 0; j < 5; j++) {
-            targetLEDs[j] = 0;
+        if (targetLEDs[j] != 0) {
+          if (targetLEDs[j] < totalLEDs || targetLEDs[j] + 1 > totalLEDs + rings[currentRing]) {
+            for (int j = 0; j < 5; j++) {
+              targetLEDs[j] = 0;
+            }
+            totalLEDs = 0;
+            Serial.println("Target out of bounds");
+            randomSeed(analogRead(A0));
+            goto resetTarget;
           }
-          totalLEDs = 0;
-          Serial.println("Target out of bounds");
-          randomSeed(analogRead(A0));
-          goto resetTarget;
         }
       }
 
@@ -386,9 +387,9 @@ resetTarget:
         }
       }
       FastLED.show();
-      delay(300);
+      delay(30);
       attachInterrupt(digitalPinToInterrupt(BUTTON), handleButton, FALLING);
-      delay(200);
+      delay(20);
       doInterrupt = true;
       while (!nextRound && !gameOver) {
         // Play the actual game
@@ -396,26 +397,33 @@ resetTarget:
         // Adjust the fade speed depending on the current ring but cap it at 160
         fadeToBlackBy(leds, NUM_LEDS, min(160, (currentRing + 1) * 25));
         
-        // Light up the target LEDs with 50% brightness yellow
+        // Light up the target LEDs with 50% brightness yellow additevly
         for (int j = 0; j < 5; j++) {
           if (targetLEDs[j] != 0) {
-            leds[targetLEDs[j]] = CHSV(64, 255, 128);
+            // Get the current color of the LED and add yellow to it
+            leds[targetLEDs[j]] = blend(leds[targetLEDs[j]], CHSV(64, 255, 128), 128);
           }
         }
-        // Light up the old target LEDs with 50% brightness red
+        // Light up the old target LEDs with 50% brightness red additevly
         for (unsigned int j = 0; j < sizeof(oldTargetLEDs) / sizeof(oldTargetLEDs[0]); j++) {
             if (oldTargetLEDs[j] != 0) {
-                leds[oldTargetLEDs[j]] = CHSV(0, 255, 128);
+              leds[oldTargetLEDs[j]] = blend(leds[oldTargetLEDs[j]], CHSV(0, 255, 128), 128);
             }
         }
         // Draw the moving light
         // Change the color of the light depending on the ring (if its in the current ring or not)
         if (currentLED < totalLEDs) {
           leds[currentLED] = CRGB::Green;
-          delay(10);
+          tone(BUZZER, 32);
+          delay(1);
+          noTone(BUZZER);
+          delay(6);
         } else {
           leds[currentLED] = CRGB::Blue;
-          delay(26);
+          tone(BUZZER, 32);
+          delay(2);
+          noTone(BUZZER);
+          delay(28);
         }
         FastLED.show();
         
@@ -424,6 +432,25 @@ resetTarget:
         if (currentLED == totalLEDs + rings[currentRing]) {
           currentLED = totalLEDs;
         }
+      }
+      // Bling the stopLED
+      for (int i = 0; i < 3; i++) {
+        if (stopLED == targetLEDs[0] || stopLED == targetLEDs[1] || stopLED == targetLEDs[2] || stopLED == targetLEDs[3] || stopLED == targetLEDs[4]) {
+          leds[stopLED] = CRGB::Purple;
+        } else {
+          leds[stopLED] = CRGB::Red;
+        }
+        FastLED.show();
+        tone(BUZZER, 800, 80);
+        delay(100);
+        if (stopLED == targetLEDs[0] || stopLED == targetLEDs[1] || stopLED == targetLEDs[2] || stopLED == targetLEDs[3] || stopLED == targetLEDs[4]) {
+          leds[stopLED] = CRGB::Yellow;
+        } else {
+          leds[stopLED] = CRGB::Black;
+        }
+        FastLED.show();
+        tone(BUZZER, 800, 80);
+        delay(100);
       }
       doInterrupt = false;
       detachInterrupt(digitalPinToInterrupt(BUTTON));
@@ -485,6 +512,9 @@ resetTarget:
   stopLED = 0;
   for (int j = 0; j < 5; j++) {
     targetLEDs[j] = 0;
+  }
+  for (int j = 0; j < 80; j++) {
+    oldTargetLEDs[j] = 0;
   }
   nextRound = false;
   gameWon = false;
