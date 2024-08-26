@@ -4,7 +4,11 @@ Made as part of Arcade Hack Club
 
 Used github copilot when writing code and readme.
 
-////// Video of the game in action//////
+
+
+https://github.com/user-attachments/assets/25a0203d-37ab-4f56-9c1b-5fb8322b415e
+
+
 
 Inspired by the arcade game [Speed Demon](https://www.arcade-museum.com/Arcade/speed-demon) I wanted to make crude version of it using a circular LED matrix I found ounline.
 
