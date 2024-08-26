@@ -397,14 +397,14 @@ resetTarget:
         // Adjust the fade speed depending on the current ring but cap it at 160
         fadeToBlackBy(leds, NUM_LEDS, min(160, (currentRing + 1) * 25));
         
-        // Light up the target LEDs with 50% brightness yellow additevly
+        // Light up the target LEDs with 70% brightness yellow additevly
         for (int j = 0; j < 5; j++) {
           if (targetLEDs[j] != 0) {
             // Get the current color of the LED and add yellow to it
             leds[targetLEDs[j]] = blend(leds[targetLEDs[j]], CHSV(64, 255, 178), 128);
           }
         }
-        // Light up the old target LEDs with 75% brightness red additevly
+        // Light up the old target LEDs with 70% brightness red additevly
         for (unsigned int j = 0; j < sizeof(oldTargetLEDs) / sizeof(oldTargetLEDs[0]); j++) {
             if (oldTargetLEDs[j] != 0) {
               leds[oldTargetLEDs[j]] = blend(leds[oldTargetLEDs[j]], CHSV(0, 255, 178), 128);
@@ -423,7 +423,7 @@ resetTarget:
           tone(BUZZER, 32);
           delayMicroseconds(1200);
           noTone(BUZZER);
-          delay(30);
+          delay(28);
         }
         FastLED.show();
         
