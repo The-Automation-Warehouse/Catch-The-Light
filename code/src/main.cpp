@@ -401,13 +401,13 @@ resetTarget:
         for (int j = 0; j < 5; j++) {
           if (targetLEDs[j] != 0) {
             // Get the current color of the LED and add yellow to it
-            leds[targetLEDs[j]] = blend(leds[targetLEDs[j]], CHSV(64, 255, 128), 128);
+            leds[targetLEDs[j]] = blend(leds[targetLEDs[j]], CHSV(64, 255, 178), 128);
           }
         }
-        // Light up the old target LEDs with 50% brightness red additevly
+        // Light up the old target LEDs with 75% brightness red additevly
         for (unsigned int j = 0; j < sizeof(oldTargetLEDs) / sizeof(oldTargetLEDs[0]); j++) {
             if (oldTargetLEDs[j] != 0) {
-              leds[oldTargetLEDs[j]] = blend(leds[oldTargetLEDs[j]], CHSV(0, 255, 128), 128);
+              leds[oldTargetLEDs[j]] = blend(leds[oldTargetLEDs[j]], CHSV(0, 255, 178), 128);
             }
         }
         // Draw the moving light
@@ -415,15 +415,15 @@ resetTarget:
         if (currentLED < totalLEDs) {
           leds[currentLED] = CRGB::Green;
           tone(BUZZER, 32);
-          delay(1);
+          delayMicroseconds(700);
           noTone(BUZZER);
           delay(6);
         } else {
           leds[currentLED] = CRGB::Blue;
           tone(BUZZER, 32);
-          delay(2);
+          delayMicroseconds(1200);
           noTone(BUZZER);
-          delay(28);
+          delay(30);
         }
         FastLED.show();
         
